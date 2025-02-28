@@ -1,11 +1,16 @@
+import stripe
 import qrcode
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render
 import json
 import datetime
+from io import BytesIO
 import requests
+from django.conf import settings
 from .models import Product, Order, OrderItem
 from .utils import cartData
+
+stripe.api_key = settings.STRIPE_SECRET_KEY
 
 def store(request):
     data = cartData(request)
@@ -21,11 +26,8 @@ def cart(request):
     cartItems = data['cartItems']
     order = data['order']
     items = data['items']
+    total_price = sum(item['product']['price'] * item['quantity'] for item in items)
     
-    total_price = 0  # คำนวณยอดรวม
-    for item in items:
-        total_price += item['product']['price'] * item['quantity']  # คำนวณยอดรวมตามจำนวนและราคา
-
     context = {
         'items': items,
         'order': order,
@@ -39,10 +41,7 @@ def checkout(request):
     cartItems = data['cartItems']
     order = data['order']
     items = data['items']
-    
-    total_price = 0
-    for item in items:
-        total_price += item['product']['price'] * item['quantity']
+    total_price = sum(item['product']['price'] * item['quantity'] for item in items)
     
     context = {
         'items': items,
@@ -52,28 +51,27 @@ def checkout(request):
     }
     return render(request, 'store/checkout.html', context)
 
-def generate_qr(request):
-    # รับข้อมูลการชำระเงินจาก query string
-    total_amount = float(request.GET.get('total'))  # รับยอดชำระจาก GET parameters
-    transaction_id = datetime.datetime.now().timestamp()  # สร้างรหัสธุรกรรม
-    receiver = "0819549978"  # หมายเลขบัญชี PromptPay (หรือข้อมูลการชำระเงินที่ต้องการ)
+def create_checkout_session(request):
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+            total_amount = int(float(data.get("total_amount", 0)) * 100)  # แปลงเป็นสตางค์
 
-    # ข้อมูลการชำระเงิน
-    qr_data = {
-        "amount": total_amount,
-        "transaction_id": transaction_id,
-        "payment_method": "PromptPay",  # เปลี่ยนเป็นวิธีการชำระเงินที่คุณใช้
-        "0819549978": receiver  # เลขบัญชีที่รับการชำระเงิน
-    }
+            # ✅ สร้าง PaymentIntent เพื่อรองรับ PromptPay
+            payment_intent = stripe.PaymentIntent.create(
+                amount=total_amount,
+                currency="thb",
+                payment_method_types=["promptpay"]
+            )
 
-    # แปลงข้อมูลเป็น JSON และสร้าง QR Code
-    qr_string = json.dumps(qr_data)
-    qr = qrcode.make(qr_string)  # ใช้ qrcode library เพื่อสร้าง QR Code
+            # ✅ ดึง QR Code URL จาก Stripe
+            promptpay_qr_code = payment_intent.next_action["promptpay_display_qr_code"]["image_url"]
 
-    # สร้างและส่งคืนภาพ QR Code
-    response = HttpResponse(content_type="image/png")
-    qr.save(response, "PNG")  # บันทึกภาพ QR Code ใน HTTP Response
-    return response
+            return JsonResponse({"qr_code_url": promptpay_qr_code}, status=200)
+
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=400)
+
 
 def updateItem(request):
     data = json.loads(request.body)
@@ -82,19 +80,17 @@ def updateItem(request):
     customer = request.user.customer
     product = Product.objects.get(id=productId)
     order, created = Order.objects.get_or_create(customer=customer, complete=False)
-
+    
     orderItem, created = OrderItem.objects.get_or_create(order=order, product=product)
-
     if action == 'add':
-        orderItem.quantity = (orderItem.quantity + 1)
+        orderItem.quantity += 1
     elif action == 'remove':
-        orderItem.quantity = (orderItem.quantity - 1)
-
+        orderItem.quantity -= 1
+    
     orderItem.save()
-
     if orderItem.quantity <= 0:
         orderItem.delete()
-
+    
     return JsonResponse('Item was added/removed', safe=False)
 
 def processOrder(request):
@@ -104,19 +100,25 @@ def processOrder(request):
     order = Order.objects.get(transaction_id=transaction_id)
     order.transaction_id = transaction_id
     order.save()
-
+    
     # ส่งคำสั่งไปยัง Raspberry Pi เพื่อควบคุมมอเตอร์
     if order.shipping:
         for item in order.orderitem_set.all():
             product = item.product
             motor_id = product.motor_id  # เอารหัสมอเตอร์จากสินค้า
-
+            
             # ส่งคำสั่งไปยัง Raspberry Pi
             response = requests.post("http://raspberry_pi_ip_address/control_motor", json={"motor_id": motor_id})
-
+            
             if response.status_code == 200:
                 print(f"มอเตอร์ {motor_id} ถูกเปิดใช้งานสำหรับสินค้า {product.name}")
             else:
                 print(f"ไม่สามารถควบคุมมอเตอร์สำหรับสินค้า {product.name}")
-
+    
     return JsonResponse('Payment submitted..', safe=False)
+
+def success(request):
+    return render(request, 'store/success.html')
+
+def cancel(request):
+    return render(request, 'store/cancel.html')
