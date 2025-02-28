@@ -28,7 +28,7 @@ DEBUG = True
 ALLOWED_HOSTS = ['*']
 
 CSRF_TRUSTED_ORIGINS = [
-    "https://98db-2001-44c8-660f-e120-3fc-7146-df12-22e2.ngrok-free.app",
+    "https://gnat-crucial-partly.ngrok-free.app",  # เปลี่ยนเป็นโดเมนปัจจุบันของคุณ
     "https://yourwebsite.com"
 ]
 
