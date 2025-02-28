@@ -1,6 +1,6 @@
 import stripe
 import qrcode
-from django.http import JsonResponse, HttpResponse
+from django.http import JsonResponse, HttpResponse, HttpResponseBadRequest
 from django.shortcuts import render
 import json
 import datetime
@@ -12,6 +12,7 @@ from .utils import cartData
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
+
 def store(request):
     data = cartData(request)
     cartItems = data['cartItems']
@@ -21,13 +22,14 @@ def store(request):
     context = {'products': products, 'cartItems': cartItems}
     return render(request, 'store/store.html', context)
 
+
 def cart(request):
     data = cartData(request)
     cartItems = data['cartItems']
     order = data['order']
     items = data['items']
     total_price = sum(item['product']['price'] * item['quantity'] for item in items)
-    
+
     context = {
         'items': items,
         'order': order,
@@ -36,13 +38,14 @@ def cart(request):
     }
     return render(request, 'store/cart.html', context)
 
+
 def checkout(request):
     data = cartData(request)
     cartItems = data['cartItems']
     order = data['order']
     items = data['items']
     total_price = sum(item['product']['price'] * item['quantity'] for item in items)
-    
+
     context = {
         'items': items,
         'order': order,
@@ -51,26 +54,31 @@ def checkout(request):
     }
     return render(request, 'store/checkout.html', context)
 
+
 def create_checkout_session(request):
-    if request.method == "POST":
-        try:
-            data = json.loads(request.body)
-            total_amount = int(float(data.get("total_amount", 0)) * 100)  # แปลงเป็นสตางค์
+    if request.method != "POST":
+        return HttpResponseBadRequest("Invalid request method. Please use POST.")
 
-            # ✅ สร้าง PaymentIntent เพื่อรองรับ PromptPay
-            payment_intent = stripe.PaymentIntent.create(
-                amount=total_amount,
-                currency="thb",
-                payment_method_types=["promptpay"]
-            )
+    try:
+        data = json.loads(request.body)
+        total_amount = int(float(data.get("total_amount", 0)) * 100)  # แปลงเป็นสตางค์
 
-            # ✅ ดึง QR Code URL จาก Stripe
+        # ✅ สร้าง PaymentIntent สำหรับ PromptPay
+        payment_intent = stripe.PaymentIntent.create(
+            amount=total_amount,
+            currency="thb",
+            payment_method_types=["promptpay"]
+        )
+
+        # ✅ ตรวจสอบว่า response มี QR Code หรือไม่
+        if 'next_action' in payment_intent and 'promptpay_display_qr_code' in payment_intent.next_action:
             promptpay_qr_code = payment_intent.next_action["promptpay_display_qr_code"]["image_url"]
-
             return JsonResponse({"qr_code_url": promptpay_qr_code}, status=200)
+        else:
+            return JsonResponse({"error": "PromptPay QR Code is not available"}, status=400)
 
-        except Exception as e:
-            return JsonResponse({'error': str(e)}, status=400)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=400)
 
 
 def updateItem(request):
@@ -80,45 +88,57 @@ def updateItem(request):
     customer = request.user.customer
     product = Product.objects.get(id=productId)
     order, created = Order.objects.get_or_create(customer=customer, complete=False)
-    
+
     orderItem, created = OrderItem.objects.get_or_create(order=order, product=product)
     if action == 'add':
         orderItem.quantity += 1
     elif action == 'remove':
         orderItem.quantity -= 1
-    
+
     orderItem.save()
     if orderItem.quantity <= 0:
         orderItem.delete()
-    
+
     return JsonResponse('Item was added/removed', safe=False)
+
 
 def processOrder(request):
     transaction_id = datetime.datetime.now().timestamp()
     data = json.loads(request.body)
     total = float(data['form']['total'])
-    order = Order.objects.get(transaction_id=transaction_id)
+
+    # ✅ เช็คว่า order มีอยู่จริงก่อน
+    order, created = Order.objects.get_or_create(transaction_id=transaction_id)
+
     order.transaction_id = transaction_id
     order.save()
-    
+
     # ส่งคำสั่งไปยัง Raspberry Pi เพื่อควบคุมมอเตอร์
     if order.shipping:
         for item in order.orderitem_set.all():
             product = item.product
             motor_id = product.motor_id  # เอารหัสมอเตอร์จากสินค้า
-            
+
             # ส่งคำสั่งไปยัง Raspberry Pi
             response = requests.post("http://raspberry_pi_ip_address/control_motor", json={"motor_id": motor_id})
-            
+
             if response.status_code == 200:
                 print(f"มอเตอร์ {motor_id} ถูกเปิดใช้งานสำหรับสินค้า {product.name}")
             else:
                 print(f"ไม่สามารถควบคุมมอเตอร์สำหรับสินค้า {product.name}")
-    
+
     return JsonResponse('Payment submitted..', safe=False)
 
+
 def success(request):
+    # ตรวจสอบว่ามี AJAX request (API) หรือเป็นการเรียกจาก Browser ปกติ
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':  
+        return JsonResponse({"message": "Payment successful"}, status=200)
     return render(request, 'store/success.html')
 
 def cancel(request):
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({"message": "Payment cancelled"}, status=200)
     return render(request, 'store/cancel.html')
+
+
