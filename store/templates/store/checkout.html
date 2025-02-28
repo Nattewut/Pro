@@ -14,7 +14,7 @@
                         <input required class="form-control" type="email" name="email" placeholder="อีเมล์...">
                     </div>
                 </div>
-                
+
                 <div id="shipping-info">
                     <hr>
                     <p>ข้อมูลการจัดส่ง:</p>
@@ -45,7 +45,6 @@
         <div class="box-element hidden" id="payment-info">
             <button id="checkout-button">ทำการชำระเงิน</button>
         </div>
-        
     </div>
 
     <div class="col-lg-6">
@@ -56,14 +55,14 @@
             <hr>
             {% for item in items %}
             <div class="cart-row">
-                <div style="flex:2"><img class="row-image" src="{{item.product.imageURL}}"></div>
-                <div style="flex:2"><p>{{item.product.name}}</p></div>
-                <div style="flex:1"><p>฿{{item.product.price|floatformat:2}}</p></div>
-                <div style="flex:1"><p>x{{item.quantity}}</p></div>
+                <div style="flex:2"><img class="row-image" src="{{ item.product.imageURL }}"></div>
+                <div style="flex:2"><p>{{ item.product.name }}</p></div>
+                <div style="flex:1"><p>฿{{ item.product.price|floatformat:2 }}</p></div>
+                <div style="flex:1"><p>x{{ item.quantity }}</p></div>
             </div>
             {% endfor %}
-            <h5>จำนวนสินค้า:   {{order.get_cart_items}}</h5>
-            <h5>ยอดรวม:   ฿{{order.get_cart_total|floatformat:2}}</h5>
+            <h5>จำนวนสินค้า: {{ order.get_cart_items }}</h5>
+            <h5>ยอดรวม: ฿{{ order.get_cart_total|floatformat:2 }}</h5>
         </div>
 
         <div class="box-element hidden" id="qr-code-section">
@@ -76,7 +75,7 @@
 
 <script type="text/javascript">
     document.getElementById("checkout-button").addEventListener("click", function () {
-        fetch("/create-checkout-session/", {
+        fetch(window.location.origin + "/create-checkout-session/", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -86,14 +85,18 @@
                 total_amount: {{ order.get_cart_total|floatformat:2 }}
             })
         })
-        .then(response => response.blob())
-        .then(blob => {
-            const img = document.getElementById("qr-code");
-            img.src = URL.createObjectURL(blob);
-            img.style.display = "block";
+        .then(response => response.json())
+        .then(data => {
+            if (data.qr_code_url) {
+                const img = document.getElementById("qr-code");
+                img.src = data.qr_code_url;
+                img.style.display = "block";
+                document.getElementById("qr-code-section").classList.remove("hidden");
+            } else {
+                throw new Error("QR Code URL ไม่ถูกต้อง");
+            }
         })
-        .catch(error => console.error("Error:", error));
+        .catch(error => alert("เกิดข้อผิดพลาด: " + error.message));
     });
 </script>
 {% endblock content %}
-
