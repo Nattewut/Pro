@@ -27,6 +27,10 @@ DEBUG = True
 
 ALLOWED_HOSTS = ['*']
 
+CSRF_TRUSTED_ORIGINS = [
+    "https://98db-2001-44c8-660f-e120-3fc-7146-df12-22e2.ngrok-free.app",
+    "https://yourwebsite.com"
+]
 
 # Application definition
 
@@ -128,3 +132,7 @@ STATICFILES_DIRS = [
 MEDIA_URL = '/images/'
 
 MEDIA_ROOT = os.path.join(BASE_DIR, 'static/images')
+
+# ✅ เพิ่ม STRIPE API KEYS
+STRIPE_SECRET_KEY = "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"
+STRIPE_PUBLIC_KEY = "pk_live_51Qv0gFJEUv3HsJxzWV1S1VgT62H6ZH8bn9yYhty1jZZAEuF1KzzC8BfS9bUsMXi5pdMwWnv5wpbFRkzhrJg2mLxY00PzRXbTtl"
