@@ -55,7 +55,7 @@ def checkout(request):
     return render(request, 'store/checkout.html', context)
 
 
-dimport json
+import json
 import stripe
 from django.http import JsonResponse, HttpResponseBadRequest
 
