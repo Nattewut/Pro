@@ -55,31 +55,46 @@ def checkout(request):
     return render(request, 'store/checkout.html', context)
 
 
+dimport json
+import stripe
+from django.http import JsonResponse, HttpResponseBadRequest
+
+# ใช้ API Key ของคุณ (เปลี่ยนเป็นตัวแปรจาก .env เพื่อความปลอดภัย)
+stripe.api_key = "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"
+
 def create_checkout_session(request):
     if request.method != "POST":
         return HttpResponseBadRequest("Invalid request method. Please use POST.")
 
     try:
         data = json.loads(request.body)
-        total_amount = int(float(data.get("total_amount", 0)) * 100)  # แปลงเป็นสตางค์
+        print("📥 ข้อมูลที่ได้รับจาก Frontend:", data)
 
-        # ✅ สร้าง PaymentIntent สำหรับ PromptPay
+        total_amount = int(float(data.get("total_amount", 0)) * 100)  # แปลงเป็นสตางค์
+        print(f"💰 ยอดรวมที่ได้รับ: {total_amount} สตางค์")
+
+        # ✅ สร้าง PaymentIntent
         payment_intent = stripe.PaymentIntent.create(
             amount=total_amount,
             currency="thb",
-            payment_method_types=["promptpay"]
+            payment_method_types=["promptpay"],
+            automatic_payment_methods={"enabled": True},  # ✅ ให้ Stripe จัดการ Payment Methods เอง
+            confirm=True  # ✅ ให้เริ่มกระบวนการชำระเงินอัตโนมัติ
         )
+        print("✅ PaymentIntent สร้างสำเร็จ:", payment_intent)
 
-        # ✅ ตรวจสอบว่า response มี QR Code หรือไม่
-        if 'next_action' in payment_intent and 'promptpay_display_qr_code' in payment_intent.next_action:
+        # ✅ ตรวจสอบค่า next_action
+        if payment_intent.next_action is not None and "promptpay_display_qr_code" in payment_intent.next_action:
             promptpay_qr_code = payment_intent.next_action["promptpay_display_qr_code"]["image_url"]
+            print("✅ QR Code URL:", promptpay_qr_code)
             return JsonResponse({"qr_code_url": promptpay_qr_code}, status=200)
         else:
-            return JsonResponse({"error": "PromptPay QR Code is not available"}, status=400)
+            print("❌ Stripe ไม่ได้ส่ง QR Code กลับมา")
+            return JsonResponse({"error": "Stripe ไม่ได้ส่ง QR Code กลับมา"}, status=400)
 
     except Exception as e:
+        print("❌ เกิดข้อผิดพลาด:", str(e))
         return JsonResponse({'error': str(e)}, status=400)
-
 
 def updateItem(request):
     data = json.loads(request.body)
