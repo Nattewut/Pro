@@ -37,13 +37,8 @@
                 </div>
 
                 <hr>
-                <input id="form-button" class="btn btn-success btn-block" type="submit" value="ดำเนินการต่อ">
+                <a href="{% url 'success' %}" class="btn btn-success btn-block">ดำเนินการต่อ</a>
             </form>
-        </div>
-
-        <br>
-        <div class="box-element hidden" id="payment-info">
-            <button id="checkout-button">ทำการชำระเงิน</button>
         </div>
     </div>
 
@@ -64,62 +59,8 @@
             <h5>จำนวนสินค้า: {{ order.get_cart_items }}</h5>
             <h5>ยอดรวม: ฿{{ order.get_cart_total|floatformat:2 }}</h5>
         </div>
-
-        <div class="box-element hidden" id="qr-code-section">
-            <h4>ชำระเงินด้วย QR Code</h4>
-            <p>กรุณาสแกน QR Code เพื่อทำการชำระเงิน:</p>
-            <img id="qr-code" src="" alt="QR Code สำหรับการชำระเงิน">
-        </div>
     </div>
 </div>
-
-<!-- Hidden CSRF Token -->
-<input type="hidden" id="csrf-token" value="{{ csrf_token }}">
-
-<script type="text/javascript">
-    document.addEventListener("DOMContentLoaded", function () {
-        console.log("✅ JavaScript โหลดสำเร็จ!");
-
-        let checkoutButton = document.getElementById("checkout-button");
-        if (!checkoutButton) {
-            console.error("❌ ปุ่ม 'checkout-button' ไม่พบ!");
-            return;
-        }
-
-        checkoutButton.addEventListener("click", function () {
-            console.log("📌 กำลังส่งคำขอไปยัง /create-checkout-session/");
-
-            // ดึงค่า CSRF Token จาก hidden input
-            let csrfToken = document.getElementById("csrf-token").value;
-
-            fetch(window.location.origin + "/create-checkout-session/", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "X-CSRFToken": csrfToken
-                },
-                body: JSON.stringify({
-                    total_amount: {{ order.get_cart_total|floatformat:2 }}
-                })
-            })
-            .then(response => {
-                console.log("✅ Response Status:", response.status);
-                return response.json();
-            })
-            .then(data => {
-                console.log("✅ Response Data:", data);
-                if (data.qr_code_url) {
-                    const img = document.getElementById("qr-code");
-                    img.src = data.qr_code_url;
-                    img.style.display = "block";
-                    document.getElementById("qr-code-section").classList.remove("hidden");
-                } else {
-                    console.error("❌ QR Code URL ไม่ถูกต้อง");
-                }
-            })
-            .catch(error => alert("❌ เกิดข้อผิดพลาด: " + error.message));
-        });
-    });
-</script>
 {% endblock content %}
+
 
