@@ -4,7 +4,7 @@ from django.http import JsonResponse, HttpResponseBadRequest
 from django.shortcuts import render
 from .models import Product, Order, OrderItem
 from .utils import cartData
-from .motor_control.motor_control import handle_motor_control
+from .motor_control import handle_motor_control
 
 # ฟังก์ชันที่รับคำสั่งจากหน้าเว็บและควบคุมมอเตอร์
 def control_motor(request, motor_number):
