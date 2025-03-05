@@ -1,6 +1,27 @@
 {% extends 'store/main.html' %}
+{% load static %}
+
 {% block content %}
-<h2>การชำระเงินสำเร็จ!</h2>
-<p>ขอบคุณที่สั่งซื้อสินค้า</p>
-<a href="{% url 'store' %}" class="btn btn-primary">กลับไปที่ร้านค้า</a>
-{% endblock %}
+<div class="row">
+    <div class="col-lg-12 text-center">
+        <div class="box-element">
+            <h2 style="color: green;">✅ ชำระเงินสำเร็จ!</h2>
+            <p>ขอบคุณที่สั่งซื้อสินค้ากับเรา</p>
+            <p>กำลังนำคุณกลับไปยังหน้าหลัก...</p>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        // รีเซ็ตข้อมูลตะกร้าให้ว่างก่อนเปลี่ยนหน้า
+        localStorage.removeItem("cart");
+        document.cookie = "cart=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/"; // ลบ cookies
+
+        setTimeout(function () {
+            window.location.href = "{% url 'store' %}";
+        }, 3000); // รอ 3 วินาทีแล้วกลับไปหน้าหลัก
+    });
+</script>
+{% endblock content %}
+
