@@ -10,6 +10,6 @@ urlpatterns = [
     path('process_order/', views.processOrder, name="process_order"),
     path('control_motor/<int:motor_number>/', views.control_motor, name="control_motor"),
     # ✅ รองรับทั้ง JSON API และ HTML Page
-    path('success/', views.success, name='success'),
-    path('cancel/', views.cancel, name='cancel'),
+    #path('success/', views.success, name='success'),
+    #path('cancel/', views.cancel, name='cancel'),
 ]
